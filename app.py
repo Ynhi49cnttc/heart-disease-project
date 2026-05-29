@@ -447,119 +447,221 @@ elif page == "🤖 Mô hình ML":
 # PAGE: DỰ ĐOÁN CÁ NHÂN
 # ─────────────────────────────────────────────
 elif page == "🩺 Dự đoán cá nhân":
-    st.markdown("## 🩺 Nhập chỉ số sức khỏe để dự đoán nguy cơ bệnh tim")
-    st.info("Nhập các thông số của bệnh nhân vào form bên dưới. Kết quả chỉ mang tính tham khảo — không thay thế chẩn đoán y khoa.")
+    st.markdown("## 🩺 Dự đoán nguy cơ bệnh tim")
+    st.info("Nhập thủ công từng bệnh nhân **hoặc** upload file CSV để dự đoán hàng loạt. Kết quả chỉ mang tính tham khảo — không thay thế chẩn đoán y khoa.")
 
-    with st.form("predict_form"):
-        st.markdown("### 🔢 Thông tin cơ bản")
-        c1, c2, c3 = st.columns(3)
-        age     = c1.number_input("Tuổi",              min_value=20, max_value=100, value=55)
-        sex     = c2.selectbox("Giới tính",            options=[0, 1], format_func=lambda x: "Nữ" if x==0 else "Nam")
-        trestbps= c3.number_input("Huyết áp nghỉ (mmHg)", min_value=80, max_value=220, value=130)
+    input_tab1, input_tab2 = st.tabs(["✍️ Nhập thủ công", "📂 Upload CSV (hàng loạt)"])
 
-        st.markdown("### ❤️ Chỉ số tim mạch")
-        c4, c5, c6 = st.columns(3)
-        chol    = c4.number_input("Cholesterol (mg/dl)", min_value=100, max_value=600, value=240)
-        thalach = c5.number_input("Nhịp tim tối đa (bpm)", min_value=60, max_value=220, value=150)
-        oldpeak = c6.number_input("ST Depression (oldpeak)", min_value=0.0, max_value=7.0, value=1.0, step=0.1)
+    # ── TAB 2: UPLOAD CSV ──────────────────────────────────────────
+    with input_tab2:
+        section("📂 Upload file CSV để dự đoán hàng loạt")
 
-        st.markdown("### 📋 Thông số lâm sàng")
-        c7, c8, c9 = st.columns(3)
-        cp      = c7.selectbox("Loại đau ngực (cp)",
-                               options=[0,1,2,3],
-                               format_func=lambda x: {0:'Không đau',1:'Điển hình',
-                                                       2:'Không điển hình',3:'Không TC'}[x])
-        fbs     = c8.selectbox("Đường huyết > 120 mg/dl?",
-                               options=[0,1], format_func=lambda x: "Không" if x==0 else "Có")
-        restecg = c9.selectbox("Kết quả ECG (restecg)",
-                               options=[0,1,2],
-                               format_func=lambda x: {0:'Bình thường',1:'ST bất thường',2:'Phì đại'}[x])
+        # Hướng dẫn + nút tải template
+        with st.expander("ℹ️ Hướng dẫn định dạng file CSV", expanded=True):
+            st.markdown("""
+File CSV cần có **13 cột** theo đúng thứ tự sau (không cần cột `target`):
 
-        c10, c11, c12 = st.columns(3)
-        exang   = c10.selectbox("Đau ngực khi gắng sức?",
-                                options=[0,1], format_func=lambda x: "Không" if x==0 else "Có")
-        slope   = c11.selectbox("Độ dốc ST (slope)",
-                                options=[0,1,2],
-                                format_func=lambda x: {0:'Dốc lên',1:'Phẳng',2:'Dốc xuống'}[x])
-        ca      = c12.selectbox("Số mạch chính (ca)", options=[0,1,2,3])
+| Cột | Mô tả | Giá trị hợp lệ |
+|-----|--------|----------------|
+| `age` | Tuổi | 20–100 |
+| `sex` | Giới tính | 0 = Nữ, 1 = Nam |
+| `cp` | Loại đau ngực | 0, 1, 2, 3 |
+| `trestbps` | Huyết áp nghỉ (mmHg) | 80–220 |
+| `chol` | Cholesterol (mg/dl) | 100–600 |
+| `fbs` | Đường huyết > 120? | 0 = Không, 1 = Có |
+| `restecg` | Kết quả ECG | 0, 1, 2 |
+| `thalach` | Nhịp tim tối đa (bpm) | 60–220 |
+| `exang` | Đau ngực khi gắng sức | 0 = Không, 1 = Có |
+| `oldpeak` | ST Depression | 0.0–7.0 |
+| `slope` | Độ dốc ST | 0, 1, 2 |
+| `ca` | Số mạch chính | 0, 1, 2, 3 |
+| `thal` | Thalassemia | 1, 2, 3 |
+""")
+            # Tạo template CSV cho người dùng tải về
+            template_df = pd.DataFrame([
+                [63,1,3,145,233,1,0,150,0,2.3,0,0,1],
+                [37,1,2,130,250,0,1,187,0,3.5,0,0,2],
+                [41,0,1,130,204,0,0,172,0,1.4,2,0,2],
+            ], columns=['age','sex','cp','trestbps','chol','fbs','restecg',
+                        'thalach','exang','oldpeak','slope','ca','thal'])
+            csv_template = template_df.to_csv(index=False)
+            st.download_button(
+                label="⬇️ Tải file CSV mẫu",
+                data=csv_template,
+                file_name="heart_disease_template.csv",
+                mime="text/csv",
+            )
 
-        thal    = st.selectbox("Thalassemia (thal)",
-                               options=[1,2,3],
-                               format_func=lambda x: {1:'Bình thường',2:'Fixed defect',3:'Reversible'}[x])
+        uploaded_file = st.file_uploader("Chọn file CSV", type=["csv"])
 
-        st.markdown("### 🤖 Chọn mô hình dự đoán")
-        model_choice = st.selectbox("Model", list(trained.keys()), index=list(trained.keys()).index(best_name))
+        if uploaded_file is not None:
+            try:
+                upload_df = pd.read_csv(uploaded_file)
 
-        submitted = st.form_submit_button("🔍 Dự đoán ngay", use_container_width=True)
+                # Kiểm tra cột
+                required_cols = ['age','sex','cp','trestbps','chol','fbs','restecg',
+                                  'thalach','exang','oldpeak','slope','ca','thal']
+                missing_cols = [c for c in required_cols if c not in upload_df.columns]
 
-    if submitted:
-        input_data = np.array([[age, sex, cp, trestbps, chol, fbs, restecg,
-                                 thalach, exang, oldpeak, slope, ca, thal]])
-        input_scaled = scaler.transform(input_data)
+                if missing_cols:
+                    st.error(f"❌ File thiếu các cột: **{', '.join(missing_cols)}**")
+                else:
+                    upload_df = upload_df[required_cols]  # đúng thứ tự
+                    st.success(f"✅ Đã đọc **{len(upload_df)} bệnh nhân** từ file.")
+                    st.dataframe(upload_df, use_container_width=True)
 
-        model = trained[model_choice]['model']
-        prob  = model.predict_proba(input_scaled)[0][1]
-        pred  = model.predict(input_scaled)[0]
+                    csv_model_choice = st.selectbox(
+                        "Chọn mô hình dự đoán",
+                        list(trained.keys()),
+                        index=list(trained.keys()).index(best_name),
+                        key="csv_model"
+                    )
 
-        st.divider()
-        st.markdown("## 📊 Kết quả Dự đoán")
+                    if st.button("🔍 Dự đoán hàng loạt", use_container_width=True):
+                        X_upload = scaler.transform(upload_df[required_cols])
+                        model_csv = trained[csv_model_choice]['model']
+                        probs = model_csv.predict_proba(X_upload)[:, 1]
+                        preds = model_csv.predict(X_upload)
 
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            if pred == 1:
-                st.markdown(f'<div class="risk-high">🔴 NGUY CƠ CAO<br>Có nguy cơ bệnh tim<br><span style="font-size:2rem">{prob:.1%}</span></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="risk-low">🟢 NGUY CƠ THẤP<br>Ít nguy cơ bệnh tim<br><span style="font-size:2rem">{prob:.1%}</span></div>', unsafe_allow_html=True)
+                        result_df = upload_df.copy()
+                        result_df.insert(0, 'STT', range(1, len(result_df)+1))
+                        result_df['Xác suất có bệnh (%)'] = (probs * 100).round(1)
+                        result_df['Dự đoán'] = ['🔴 Có nguy cơ' if p==1 else '🟢 Ít nguy cơ' for p in preds]
 
-            st.metric("Model sử dụng", model_choice)
-            st.metric("Xác suất có bệnh", f"{prob:.2%}")
-            st.metric("Xác suất không bệnh", f"{(1-prob):.2%}")
+                        section("📋 Kết quả dự đoán hàng loạt")
+                        st.dataframe(
+                            result_df[['STT','age','sex','thalach','oldpeak','chol',
+                                       'Xác suất có bệnh (%)','Dự đoán']],
+                            use_container_width=True
+                        )
 
-        with c2:
-            # Gauge chart
-            fig, ax = plt.subplots(figsize=(6, 4), subplot_kw=dict(polar=False))
-            fig.patch.set_alpha(0)
-            ax.set_aspect('equal')
-            ax.axis('off')
+                        # Biểu đồ phân bố xác suất
+                        fig_csv, ax_csv = plt.subplots(figsize=(8, 3))
+                        ax_csv.hist(probs * 100, bins=20, color=BLUE, edgecolor='white', alpha=0.8)
+                        ax_csv.axvline(50, color=RED, linestyle='--', linewidth=1.5, label='Ngưỡng 50%')
+                        ax_csv.set_xlabel('Xác suất có bệnh (%)')
+                        ax_csv.set_ylabel('Số bệnh nhân')
+                        ax_csv.set_title('Phân bố xác suất nguy cơ', fontweight='bold')
+                        ax_csv.legend(); ax_csv.grid(alpha=0.3)
+                        plt.tight_layout()
+                        st.pyplot(fig_csv); plt.close()
 
-            # Draw semi-circle gauge
-            theta = np.linspace(np.pi, 0, 100)
-            ax.plot(np.cos(theta), np.sin(theta), color='#ddd', linewidth=20, solid_capstyle='round')
-            theta_fill = np.linspace(np.pi, np.pi - prob * np.pi, 100)
-            fill_color = RED if prob > 0.5 else ('#F5A623' if prob > 0.3 else BLUE)
-            ax.plot(np.cos(theta_fill), np.sin(theta_fill),
-                    color=fill_color, linewidth=20, solid_capstyle='round')
-            ax.text(0, -0.1, f"{prob:.1%}", ha='center', va='center',
-                    fontsize=32, fontweight='bold', color=fill_color)
-            ax.text(0, -0.4, "Xác suất có bệnh tim", ha='center', va='center',
-                    fontsize=12, color='#555')
-            ax.set_xlim(-1.3, 1.3); ax.set_ylim(-0.6, 1.2)
+                        # Nút tải kết quả về
+                        csv_out = result_df.to_csv(index=False).encode('utf-8-sig')
+                        st.download_button(
+                            label="⬇️ Tải kết quả CSV",
+                            data=csv_out,
+                            file_name="heart_disease_results.csv",
+                            mime="text/csv",
+                        )
+
+            except Exception as e:
+                st.error(f"❌ Lỗi đọc file: {e}")
+
+    # ── TAB 1: NHẬP THỦ CÔNG ──────────────────────────────────────
+    with input_tab1:
+        with st.form("predict_form"):
+            st.markdown("### 🔢 Thông tin cơ bản")
+            c1, c2, c3 = st.columns(3)
+            age      = c1.number_input("Tuổi", min_value=20, max_value=100, value=55)
+            sex      = c2.selectbox("Giới tính", options=[0, 1], format_func=lambda x: "Nữ" if x==0 else "Nam")
+            trestbps = c3.number_input("Huyết áp nghỉ (mmHg)", min_value=80, max_value=220, value=130)
+
+            st.markdown("### ❤️ Chỉ số tim mạch")
+            c4, c5, c6 = st.columns(3)
+            chol    = c4.number_input("Cholesterol (mg/dl)", min_value=100, max_value=600, value=240)
+            thalach = c5.number_input("Nhịp tim tối đa (bpm)", min_value=60, max_value=220, value=150)
+            oldpeak = c6.number_input("ST Depression (oldpeak)", min_value=0.0, max_value=7.0, value=1.0, step=0.1)
+
+            st.markdown("### 📋 Thông số lâm sàng")
+            c7, c8, c9 = st.columns(3)
+            cp      = c7.selectbox("Loại đau ngực (cp)", options=[0,1,2,3],
+                                   format_func=lambda x: {0:'Không đau',1:'Điển hình',
+                                                           2:'Không điển hình',3:'Không TC'}[x])
+            fbs     = c8.selectbox("Đường huyết > 120 mg/dl?", options=[0,1],
+                                   format_func=lambda x: "Không" if x==0 else "Có")
+            restecg = c9.selectbox("Kết quả ECG (restecg)", options=[0,1,2],
+                                   format_func=lambda x: {0:'Bình thường',1:'ST bất thường',2:'Phì đại'}[x])
+
+            c10, c11, c12 = st.columns(3)
+            exang = c10.selectbox("Đau ngực khi gắng sức?", options=[0,1],
+                                  format_func=lambda x: "Không" if x==0 else "Có")
+            slope = c11.selectbox("Độ dốc ST (slope)", options=[0,1,2],
+                                  format_func=lambda x: {0:'Dốc lên',1:'Phẳng',2:'Dốc xuống'}[x])
+            ca    = c12.selectbox("Số mạch chính (ca)", options=[0,1,2,3])
+
+            thal  = st.selectbox("Thalassemia (thal)", options=[1,2,3],
+                                 format_func=lambda x: {1:'Bình thường',2:'Fixed defect',3:'Reversible'}[x])
+
+            st.markdown("### 🤖 Chọn mô hình dự đoán")
+            model_choice = st.selectbox("Model", list(trained.keys()),
+                                        index=list(trained.keys()).index(best_name))
+
+            submitted = st.form_submit_button("🔍 Dự đoán ngay", use_container_width=True)
+
+        # if submitted nằm NGOÀI with st.form nhưng TRONG with input_tab1
+        if submitted:
+            input_data = np.array([[age, sex, cp, trestbps, chol, fbs, restecg,
+                                    thalach, exang, oldpeak, slope, ca, thal]])
+            input_scaled = scaler.transform(input_data)
+
+            model = trained[model_choice]['model']
+            prob  = model.predict_proba(input_scaled)[0][1]
+            pred  = model.predict(input_scaled)[0]
+
+            st.divider()
+            st.markdown("## 📊 Kết quả Dự đoán")
+
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                if pred == 1:
+                    st.markdown(f'<div class="risk-high">🔴 NGUY CƠ CAO<br>Có nguy cơ bệnh tim<br><span style="font-size:2rem">{prob:.1%}</span></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="risk-low">🟢 NGUY CƠ THẤP<br>Ít nguy cơ bệnh tim<br><span style="font-size:2rem">{prob:.1%}</span></div>', unsafe_allow_html=True)
+                st.metric("Model sử dụng", model_choice)
+                st.metric("Xác suất có bệnh", f"{prob:.2%}")
+                st.metric("Xác suất không bệnh", f"{(1-prob):.2%}")
+
+            with c2:
+                fig, ax = plt.subplots(figsize=(6, 4))
+                fig.patch.set_alpha(0)
+                ax.set_aspect('equal')
+                ax.axis('off')
+                theta = np.linspace(np.pi, 0, 100)
+                ax.plot(np.cos(theta), np.sin(theta), color='#ddd', linewidth=20, solid_capstyle='round')
+                theta_fill = np.linspace(np.pi, np.pi - prob * np.pi, 100)
+                fill_color = RED if prob > 0.5 else ('#F5A623' if prob > 0.3 else BLUE)
+                ax.plot(np.cos(theta_fill), np.sin(theta_fill),
+                        color=fill_color, linewidth=20, solid_capstyle='round')
+                ax.text(0, -0.1, f"{prob:.1%}", ha='center', va='center',
+                        fontsize=32, fontweight='bold', color=fill_color)
+                ax.text(0, -0.4, "Xác suất có bệnh tim", ha='center', va='center',
+                        fontsize=12, color='#555')
+                ax.set_xlim(-1.3, 1.3); ax.set_ylim(-0.6, 1.2)
+                st.pyplot(fig); plt.close()
+
+            st.divider()
+            section("📈 Chỉ số của bạn so với 2 nhóm trong dataset")
+            numeric_cols = ['age','trestbps','chol','thalach','oldpeak']
+            input_dict   = dict(zip(feature_cols, input_data[0]))
+
+            fig, axes = plt.subplots(1, 5, figsize=(16, 3))
+            for ax, col in zip(axes, numeric_cols):
+                g0 = df[df['target']==0][col]
+                g1 = df[df['target']==1][col]
+                ax.boxplot([g0, g1], patch_artist=True,
+                           boxprops=dict(facecolor='white'),
+                           medianprops=dict(color='black', linewidth=2))
+                ax.scatter([1, 2], [g0.median(), g1.median()], color=[BLUE, RED], s=50, zorder=5)
+                user_val = input_dict[col]
+                ax.axhline(user_val, color='purple', linewidth=2, linestyle='--', label='Bạn')
+                ax.set_xticks([1, 2]); ax.set_xticklabels(['Không\nbệnh','Có\nbệnh'], fontsize=8)
+                ax.set_title(col, fontweight='bold', fontsize=10)
+                if col == 'oldpeak':
+                    ax.legend(fontsize=7)
+            plt.suptitle('Chỉ số của bạn (đường tím) so với 2 nhóm dataset',
+                         fontsize=12, fontweight='bold')
+            plt.tight_layout()
             st.pyplot(fig); plt.close()
 
-        # Feature contribution (so với median của dataset)
-        st.divider()
-        section("📈 Chỉ số của bạn so với 2 nhóm trong dataset")
-        numeric_cols = ['age','trestbps','chol','thalach','oldpeak']
-        input_dict   = dict(zip(feature_cols, input_data[0]))
-
-        fig, axes = plt.subplots(1, 5, figsize=(16, 3))
-        for ax, col in zip(axes, numeric_cols):
-            g0 = df[df['target']==0][col]
-            g1 = df[df['target']==1][col]
-            ax.boxplot([g0, g1], patch_artist=True,
-                       boxprops=dict(facecolor='white'),
-                       medianprops=dict(color='black', linewidth=2))
-            ax.scatter([1, 2], [g0.median(), g1.median()], color=[BLUE, RED], s=50, zorder=5)
-            # User value
-            user_val = input_dict[col]
-            ax.axhline(user_val, color='purple', linewidth=2, linestyle='--', label='Bạn')
-            ax.set_xticks([1, 2]); ax.set_xticklabels(['Không\nbệnh','Có\nbệnh'], fontsize=8)
-            ax.set_title(col, fontweight='bold', fontsize=10)
-            if col == 'oldpeak':
-                ax.legend(fontsize=7)
-        plt.suptitle('Chỉ số của bạn (đường tím) so với 2 nhóm dataset',
-                     fontsize=12, fontweight='bold')
-        plt.tight_layout()
-        st.pyplot(fig); plt.close()
-
-        st.warning("⚠️ **Lưu ý**: Kết quả này được tính bằng mô hình học máy huấn luyện trên dataset Cleveland 1988 (303 mẫu). Đây chỉ là công cụ tham khảo — vui lòng tham khảo ý kiến bác sĩ để được chẩn đoán chính xác.")
+            st.warning("⚠️ **Lưu ý**: Kết quả này được tính bằng mô hình học máy huấn luyện trên dataset Cleveland 1988 (303 mẫu). Đây chỉ là công cụ tham khảo — vui lòng tham khảo ý kiến bác sĩ để được chẩn đoán chính xác.")
